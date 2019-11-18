@@ -3,6 +3,12 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
+#define DEBUGF 0
+
+#define DEBUG(f) (DEBUGF ? f : (void)0);
+
+#define ROUNDS 2
+
 typedef struct block_t {
   unsigned char n0 : 4;
   unsigned char n1 : 4;
@@ -10,6 +16,12 @@ typedef struct block_t {
   unsigned char n3 : 4;
 } __attribute__ ((packed)) block_t;
 
+block_t K0 = {
+  .n0 = 0b1100,
+  .n1 = 0b0011,
+  .n2 = 0b1111,
+  .n3 = 0b0000
+};
 
 //--------------------------------------------------------
 // UTIL
@@ -23,6 +35,20 @@ inline void error(const char *fmt, ...) {
   va_end(args);
 
   exit(-1);
+}
+
+#define bit_print(c, n) ((c >> n) & 1 ? printf("1") : printf("0"))
+#define print_nibble(c) for (int _i = 3; _i >= 0; _i--) bit_print(c, _i); printf(" ");
+
+void print_block(block_t *b, size_t len) {
+  for (unsigned int i = 0; i < len; i++) {
+    printf("(%d) ", i);
+    print_nibble(b[i].n0); 
+    print_nibble(b[i].n1); 
+    print_nibble(b[i].n2); 
+    print_nibble(b[i].n3); 
+    printf("\n");
+  }
 }
 
 block_t *to_block(char *msg, size_t *len) {
@@ -67,7 +93,7 @@ unsigned char add(unsigned char l, unsigned char r) {
 }
 
 unsigned char mul(unsigned char l, unsigned char r) {
-  return ((l & 0b10 ? r << 1 : 0) ^ (l & 1 ? r : 0)) ^ 0b10011;
+  return ((r & 0b10 ? l << 1 : 0) ^ (r & 1 ? l : 0)) ^ 0b10011;
 }
 
 //--------------------------------------------------------
@@ -178,31 +204,18 @@ void key_add(block_t *b, block_t *k) {
 // GENERATE NEXT KEY
 //--------------------------------------------------------
 
-block_t K0 = {
-  .n0 = 0b1000,
-  .n1 = 0b1010,
-  .n2 = 0b0011,
-  .n3 = 0b1010
-};
+block_t *gen_key(block_t *k0, unsigned int r) {
+  block_t *res = malloc(r * sizeof(block_t));
 
-block_t K;
+  memcpy(res, k0, sizeof(block_t));
+  for (unsigned int i = 1; i < r; i++) {
+    res[i].n0 = res[i - 1].n0 ^ SUB_TABLE[res[i - 1].n3] ^ (1 << ((i - 1) % 4)); // care
+    res[i].n1 = res[i - 1].n1 ^ res[i].n0;
+    res[i].n2 = res[i - 1].n2 ^ res[i].n1;
+    res[i].n3 = res[i - 1].n3 ^ res[i].n2;
+  }
 
-void next_key(block_t *k, unsigned int r) {
-  block_t ck;
-  memcpy(&ck, k, sizeof(block_t));
-  k->n0 = ck.n0 ^ SUB_TABLE[ck.n3] ^ (1 << (r % 4)); // care
-  k->n1 = ck.n1 ^ k->n0;
-  k->n2 = ck.n2 ^ k->n1;
-  k->n3 = ck.n3 ^ k->n2;
-}
-
-void next_key_inv(block_t *k, unsigned int r) {
-  block_t ck;
-  memcpy(&ck, k, sizeof(block_t));
-  k->n0 = ck.n0 ^ SUB_TABLE_INV[ck.n3] ^ (1 << (r % 4)); // care
-  k->n1 = ck.n1 ^ k->n0;
-  k->n2 = ck.n2 ^ k->n1;
-  k->n3 = ck.n3 ^ k->n2;
+  return res;
 }
 
 //--------------------------------------------------------
@@ -210,72 +223,139 @@ void next_key_inv(block_t *k, unsigned int r) {
 //--------------------------------------------------------
 
 void encrypt(block_t *b, block_t *k, unsigned int r) {
+  DEBUG(printf("ENCRYPING:\n"));
+  DEBUG(print_block(b, 1));
+  DEBUG(printf("KEY:\n"));
+  DEBUG(print_block(k, r + 1));
   key_add(b, k);
+  DEBUG(printf("KEY ADDITION:\n"));
+  DEBUG(print_block(b, 1));
   for (unsigned int i = 1; i < r; i++) {
-    next_key(k, i);
     nibble_sub(b);
+    DEBUG(printf("NIBBLE SUB\n"));
+    DEBUG(print_block(b, 1));
     shift_row(b);
+    DEBUG(printf("SHIFT ROW\n"));
+    DEBUG(print_block(b, 1));
     mix_column(b);
-    key_add(b, k);
+    DEBUG(printf("MIX COLUMN\n"));
+    DEBUG(print_block(b, 1));
+    key_add(b, k + i);
+    DEBUG(printf("KEY ADD\n"));
+    DEBUG(print_block(b, 1));
   }
-  next_key(k, r);
   nibble_sub(b);
+  DEBUG(printf("NIBBLE SUB\n"));
+  DEBUG(print_block(b, 1));
   shift_row(b);
-  key_add(b, k);
+  DEBUG(printf("SHIFT ROW\n"));
+  DEBUG(print_block(b, 1));
+  key_add(b, k + r);
+  DEBUG(printf("KEY ADDITION:\n"));
+  DEBUG(print_block(b, 1));
 }
 
 void decrypt(block_t  *b, block_t *k, unsigned int r) {
-  key_add(b, k);
-  for (unsigned int i = 1; i < r; i++) {
-    next_key_inv(k, i);
-    shift_row(b);
+  DEBUG(printf("ENCRYPING:\n"));
+  DEBUG(print_block(b, 1));
+  DEBUG(printf("KEY:\n"));
+  DEBUG(print_block(k, r + 1));
+  key_add(b, k + r);
+  DEBUG(printf("KEY ADDITION:\n"));
+  DEBUG(print_block(b, 1));
+  for (unsigned int i = r - 1; i > 0; i--) {
     nibble_sub_inv(b);
+    DEBUG(printf("NIBBLE SUB\n"));
+    DEBUG(print_block(b, 1));
+    shift_row(b);
+    DEBUG(printf("SHIFT ROW\n"));
+    DEBUG(print_block(b, 1));
+    key_add(b, k + i);
+    DEBUG(printf("KEY ADD\n"));
+    DEBUG(print_block(b, 1));
     mix_column(b);
-    key_add(b, k);
+    DEBUG(printf("MIX COLUMN\n"));
+    DEBUG(print_block(b, 1));
   }
-  next_key_inv(k, r);
-  shift_row(b);
   nibble_sub_inv(b);
+  DEBUG(printf("NIBBLE SUB\n"));
+  DEBUG(print_block(b, 1));
+  shift_row(b);
+  DEBUG(printf("SHIFT ROW\n"));
+  DEBUG(print_block(b, 1));
   key_add(b, k);
-
+  DEBUG(printf("KEY ADD\n"));
+  DEBUG(print_block(b, 1));
 }
 
 int main(int argc, char **argv) {
 
-  if (argc <= 1) {
-    error("usage: ./mini_aes message\n");
+  if (argc <= 2) {
+    error("usage: ./mini_aes (d|e) file\n");
   }
 
-  size_t msg_len = strlen(argv[1]);
+  FILE *in = fopen(argv[2], "rb");
+
+  char *outf = malloc(strlen(argv[2]) + 5);
+  memcpy(outf, argv[2], strlen(argv[2]));
+  strcat(outf, ".out"); 
+  FILE *out = fopen(outf, "wb");
+
+  if (!out || !in) {
+    error("unable to open out/input file: %s", argv[2], outf);
+  }
+
+  size_t msg_len;
+  fseek(in , 0L , SEEK_END);
+  msg_len = ftell(in);
+  rewind(in);
+  char *msg= malloc(msg_len);
+  if (!fread(msg, msg_len, 1, in)) {
+    error("unable to read complete file\n");
+  }
+
   if (msg_len % 2) {
     error("invalid odd message length: %d\n", msg_len);
   }
 
-  printf("encrypting: %s\n", argv[1]);
-
   size_t block_len = 0;
-  block_t *block = to_block(argv[1], &block_len);
+  block_t *block = to_block(msg, &block_len);
 
   // init key 
-  memcpy(&K, &K0, sizeof(block_t));
+  block_t *key = gen_key(&K0, ROUNDS + 1);
 
-#define ROUNDS 2 // needs to be mod 4
-  for (unsigned int i = 0; i < block_len; i++) {
-    encrypt(block + i, &K, ROUNDS);
+  if (argv[1][0] == 'e') {
+    printf("ENCRYPTING: %s\n", msg);
+
+    for (unsigned int i = 0; i < block_len; i++) {
+      encrypt(block + i, key, ROUNDS);
+    }
+
+  } else if (argv[1][0] == 'd') {
+    printf("DECRYPTING: %s\n", msg);
+
+    for (unsigned int i = 0; i < block_len; i++) {
+      decrypt(block + i, key, ROUNDS);
+    }
+
+  } else {
+    printf("invalid encryption method: %c\n", argv[1][0]);
   }
 
-  memcpy(&K, &K0, sizeof(block_t));
-  for (unsigned int i = 0; i < block_len; i++) {
-    decrypt(block + i, &K, ROUNDS);
+  char *res = to_str(block, block_len);
+
+  printf("result: %s\n", res);
+
+  if (!fwrite(res, msg_len, 1, out)) {
+    error("unable to write complete output to file\n");
   }
 
-  char *cipher = to_str(block, block_len);
-
-  printf("cipher: %s\n", cipher);
-
+  free(msg);
   free(block);
-  free(cipher);  
+  free(res);  
 
+  fclose(in);
+  fclose(out);
 
   return 0;
 }
