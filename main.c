@@ -27,7 +27,7 @@ block_t K0 = {
 // UTIL
 //--------------------------------------------------------
 
-inline void error(const char *fmt, ...) {
+void panic(const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
   printf("ERROR: ");
@@ -55,7 +55,7 @@ block_t *to_block(char *msg, size_t *len) {
   *len = strlen(msg);
 
   if (*len % 2) {
-    error("invalid odd message length: %d\n", len);
+    panic("invalid odd message length: %d\n", len);
   }
 
   *len /= 2;
@@ -291,7 +291,7 @@ void decrypt(block_t  *b, block_t *k, unsigned int r) {
 int main(int argc, char **argv) {
 
   if (argc <= 2) {
-    error("usage: ./mini_aes (d|e) file\n");
+    panic("usage: ./mini_aes (d|e) file\n");
   }
 
   FILE *in = fopen(argv[2], "rb");
@@ -302,7 +302,7 @@ int main(int argc, char **argv) {
   FILE *out = fopen(outf, "wb");
 
   if (!out || !in) {
-    error("unable to open out/input file: %s", argv[2], outf);
+    panic("unable to open out/input file: %s", argv[2], outf);
   }
 
   size_t msg_len;
@@ -311,11 +311,11 @@ int main(int argc, char **argv) {
   rewind(in);
   char *msg= malloc(msg_len);
   if (!fread(msg, msg_len, 1, in)) {
-    error("unable to read complete file\n");
+    panic("unable to read complete file\n");
   }
 
   if (msg_len % 2) {
-    error("invalid odd message length: %d\n", msg_len);
+    panic("invalid odd message length: %d\n", msg_len);
   }
 
   size_t block_len = 0;
@@ -347,7 +347,7 @@ int main(int argc, char **argv) {
   printf("result: %s\n", res);
 
   if (!fwrite(res, msg_len, 1, out)) {
-    error("unable to write complete output to file\n");
+    panic("unable to write complete output to file\n");
   }
 
   free(msg);
