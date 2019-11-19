@@ -3,7 +3,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-#define DEBUGF 0
+#define DEBUGF 1
 
 #define DEBUG(f) (DEBUGF ? f : (void)0);
 
@@ -256,7 +256,7 @@ void encrypt(block_t *b, block_t *k, unsigned int r) {
 }
 
 void decrypt(block_t  *b, block_t *k, unsigned int r) {
-  DEBUG(printf("ENCRYPING:\n"));
+  DEBUG(printf("DECRYPTING:\n"));
   DEBUG(print_block(b, 1));
   DEBUG(printf("KEY:\n"));
   DEBUG(print_block(k, r + 1));
