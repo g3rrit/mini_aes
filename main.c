@@ -93,8 +93,8 @@ unsigned char add(unsigned char l, unsigned char r) {
 }
 
 unsigned char mul(unsigned char l, unsigned char r) {
-  unsigned short tr = ((r & 0b10 ? l << 1 : 0) ^ (r & 1 ? l : 0));
-  return (tr >= 255 ? tr ^ 0b10011 : tr);
+  unsigned char tr = ((l & 0b10 ? r << 1 : 0) ^ (l & 1 ? r : 0));
+  return (tr >= 16 ? tr ^ 0b10011 : tr);
 }
 
 //--------------------------------------------------------
@@ -180,10 +180,10 @@ block_t const MCM = {
 };
 
 void mix_column(block_t *b) {
-  unsigned char r0 = add(mul(b->n0, MCM.n0), mul(b->n1, MCM.n2));
-  unsigned char r1 = add(mul(b->n0, MCM.n1), mul(b->n1, MCM.n3));
-  unsigned char r2 = add(mul(b->n2, MCM.n0), mul(b->n3, MCM.n2));
-  unsigned char r3 = add(mul(b->n2, MCM.n1), mul(b->n3, MCM.n3));
+  unsigned char r0 = add(mul(MCM.n0, b->n0), mul(MCM.n2, b->n1));
+  unsigned char r1 = add(mul(MCM.n1, b->n0), mul(MCM.n3, b->n1));
+  unsigned char r2 = add(mul(MCM.n0, b->n2), mul(MCM.n2, b->n3));
+  unsigned char r3 = add(mul(MCM.n1, b->n2), mul(MCM.n3, b->n3));
   b->n0 = r0;
   b->n1 = r1;
   b->n2 = r2;
