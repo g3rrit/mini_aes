@@ -93,7 +93,8 @@ unsigned char add(unsigned char l, unsigned char r) {
 }
 
 unsigned char mul(unsigned char l, unsigned char r) {
-  return ((r & 0b10 ? l << 1 : 0) ^ (r & 1 ? l : 0)) ^ 0b10011;
+  unsigned short tr = ((r & 0b10 ? l << 1 : 0) ^ (r & 1 ? l : 0));
+  return (tr >= 255 ? tr ^ 0b10011 : tr);
 }
 
 //--------------------------------------------------------
